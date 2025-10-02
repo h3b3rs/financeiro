@@ -1,27 +1,28 @@
 const express = require('express');
-const cors = require('cors');
 const mysql = require('mysql2/promise'); // Usando a versão promise para async/await
 
 const app = express();
 const PORT = 3000;
 
-// Configuração da Conexão MySQL (Usando suas Credenciais)
+// Configuração da Conexão MySQL (Credenciais)
+// Estas são as credenciais do seu serviço EasyPanel
 const dbConfig = {
-    host: 'hpspeniel_mysql', // Host Interno do EasyPanel
+    host: 'mysql', // Nome do serviço MySQL na rede Docker (Corrigido)
     user: 'mega',
-    password: 'megamega',
+    password: 'teste 123', // Senha que você forneceu.
     database: 'hpspeniel',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
 };
 
-// Middleware CORS MANUAL (Para garantir que o cabeçalho seja enviado pelo proxy)
+// Middleware CORS MANUAL (Solução para o erro 'Failed to fetch')
+// Este bloco garante que o cabeçalho de permissão seja enviado, contornando o proxy.
 app.use((req, res, next) => {
-    // Permite que qualquer origem acesse (incluindo seu Live Server)
+    // Permite que qualquer origem (incluindo seu Live Server local) acesse
     res.setHeader('Access-Control-Allow-Origin', '*'); 
     
-    // Permite os métodos que o front-end usa
+    // Permite os métodos que o front-end usa (POST para envio, OPTIONS para o pré-voo)
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
     
     // Permite o cabeçalho Content-Type (essencial para o JSON)
@@ -41,10 +42,7 @@ let pool; // Variável para manter o pool de conexões do MySQL
 // Função para iniciar a conexão com o banco e criar a tabela se não existir
 async function initializeDatabase() {
     try {
-        // Cria o pool de conexão
         pool = mysql.createPool(dbConfig);
-        
-        // Testa a conexão e cria a tabela
         const connection = await pool.getConnection();
         
         // Query SQL para criar a tabela se ela ainda não existir
@@ -62,13 +60,14 @@ async function initializeDatabase() {
         `;
         
         await connection.query(createTableQuery);
-        connection.release(); // Libera a conexão
+        connection.release(); 
         
         console.log("Conexão com MySQL estabelecida e tabela 'contas_a_pagar' verificada/criada.");
 
     } catch (error) {
         console.error("ERRO FATAL ao iniciar o banco de dados:", error.message);
-        // Em um ambiente de produção, você pode querer sair do processo
+        // Garante que o processo Node.js saia se o banco não estiver acessível
+        process.exit(1); 
     }
 }
 
@@ -76,7 +75,6 @@ async function initializeDatabase() {
 app.post('/contas-a-pagar', async (req, res) => {
     const { valor, classe, centroCusto, fornecedor } = req.body;
     
-    // Extrai dados do fornecedor
     const fornecedorNome = fornecedor.nome || fornecedor.razaoSocial;
     const fornecedorDoc = fornecedor.documento;
     const tipoFornecedor = fornecedor.tipo;
@@ -89,7 +87,6 @@ app.post('/contas-a-pagar', async (req, res) => {
     }
 
     try {
-        // Query para inserção de dados no MySQL
         const insertQuery = `
             INSERT INTO contas_a_pagar 
             (valor, classe, centroCusto, fornecedorNome, fornecedorDoc, tipoFornecedor) 
@@ -133,9 +130,4 @@ initializeDatabase().then(() => {
         console.log(`Servidor rodando na porta http://localhost:${PORT}`);
         console.log(`API pronta para receber requisições em /contas-a-pagar`);
     });
-
 });
-
-
-
-
