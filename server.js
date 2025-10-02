@@ -9,7 +9,7 @@ const PORT = 3000;
 const dbConfig = {
     host: 'mysql', // Nome do serviço MySQL na rede Docker (Corrigido)
     user: 'mega',
-    password: 'teste 123', // Senha que você forneceu.
+    password: 'megamega', // Senha que você forneceu.
     database: 'hpspeniel',
     waitForConnections: true,
     connectionLimit: 10,
@@ -131,3 +131,4 @@ initializeDatabase().then(() => {
         console.log(`API pronta para receber requisições em /contas-a-pagar`);
     });
 });
+
