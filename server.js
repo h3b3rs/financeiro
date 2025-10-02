@@ -6,32 +6,32 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-/* ===== CORS =====
-   Em dev, permita as origens que você usa (Live Server e seu domínio).  */
-const ALLOWED_ORIGINS = [
-  'https://hpspeniel.com.br',
-  'https://www.hpspeniel.com.br'
-];
+/* ===== CORS ===== */
+const DEV_ORIGINS  = ['http://127.0.0.1:5500', 'http://localhost:5500'];
+const PROD_ORIGINS = ['https://hpspeniel.com.br', 'https://www.hpspeniel.com.br'];
+
+const ALLOWED_ORIGINS = process.env.NODE_ENV === 'production'
+  ? PROD_ORIGINS
+  : [...DEV_ORIGINS, ...PROD_ORIGINS];
+
 app.use(cors({
   origin: (origin, cb) => {
+    // Permite requisições sem Origin (curl/healthcheck) e as origens permitidas
     if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
     return cb(new Error('Not allowed by CORS'));
   },
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: false,
   maxAge: 86400
 }));
 app.options('*', cors()); // responde preflight
 
-// lê JSON do body
+// Body parser
 app.use(express.json());
 app.set('trust proxy', true);
 
-/* ===== MySQL =====
-   ATENÇÃO: o host precisa ser o NOME do serviço MySQL no EasyPanel.
-   Se o seu serviço chama “mysql” mesmo, deixe assim.
-   Se o nome for outro (ex.: hpspeniel-mysql), troque abaixo. */
+/* ===== MySQL ===== */
 const dbConfig = {
   host: process.env.MYSQL_HOST || 'mysql',
   user: process.env.MYSQL_USER || 'mega',
@@ -50,11 +50,11 @@ async function initializeDatabase() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS contas_a_pagar (
       id INT AUTO_INCREMENT PRIMARY KEY,
-      valor DECIMAL(10,2) NOT NULL,
-      classe VARCHAR(50) NOT NULL,
-      centroCusto VARCHAR(50) NOT NULL,
+      valor DECIMAL(12,2) NOT NULL,
+      classe VARCHAR(80) NOT NULL,
+      centroCusto VARCHAR(80) NOT NULL,
       fornecedorNome VARCHAR(255) NOT NULL,
-      fornecedorDoc VARCHAR(30) NOT NULL,
+      fornecedorDoc VARCHAR(32) NOT NULL,
       tipoFornecedor ENUM('PF','PJ') NOT NULL,
       dataRegistro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -68,7 +68,7 @@ async function initializeDatabase() {
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.get('/', (req, res) => {
-  res.status(200).json({ message: "API de Contas a Pagar está online!" });
+  res.status(200).json({ message: 'API de Contas a Pagar está online!' });
 });
 
 app.post('/contas-a-pagar', async (req, res) => {
@@ -78,20 +78,24 @@ app.post('/contas-a-pagar', async (req, res) => {
     const fornecedorDoc  = fornecedor?.documento;
     const tipoFornecedor = fornecedor?.tipo; // 'PF' | 'PJ'
 
-    if (
-      valor === undefined || valor === null ||
-      !classe || !centroCusto || !fornecedorNome || !fornecedorDoc || !tipoFornecedor
-    ) {
-      return res.status(400).json({ error: "Todos os campos de conta e fornecedor são obrigatórios." });
+    // valor: aceita "1.500,00" ou "1500.00"
+    const rawValor = (valor ?? '').toString().replace(/\./g, '').replace(',', '.');
+    const valorNum = Number(rawValor);
+
+    if (!Number.isFinite(valorNum) || valorNum <= 0) {
+      return res.status(400).json({ error: 'Valor inválido.' });
+    }
+    if (!classe || !centroCusto || !fornecedorNome || !fornecedorDoc || !['PF','PJ'].includes(tipoFornecedor)) {
+      return res.status(400).json({ error: 'Campos obrigatórios ausentes ou inválidos.' });
     }
 
     const insertQuery = `
       INSERT INTO contas_a_pagar
-      (valor, classe, centroCusto, fornecedorNome, fornecedorDoc, tipoFornecedor)
+        (valor, classe, centroCusto, fornecedorNome, fornecedorDoc, tipoFornecedor)
       VALUES (?, ?, ?, ?, ?, ?)
     `;
     const values = [
-      Number(valor),
+      valorNum,
       String(classe),
       String(centroCusto),
       String(fornecedorNome),
@@ -100,10 +104,10 @@ app.post('/contas-a-pagar', async (req, res) => {
     ];
 
     const [result] = await pool.query(insertQuery, values);
-    return res.status(201).json({ message: "Conta registrada com sucesso!", id: result.insertId });
+    return res.status(201).json({ message: 'Conta registrada com sucesso!', id: result.insertId });
   } catch (err) {
     console.error('Erro ao inserir dados:', err);
-    return res.status(500).json({ error: "Falha interna ao registrar a conta.", details: err.message });
+    return res.status(500).json({ error: 'Falha interna ao registrar a conta.', details: err.message });
   }
 });
 
@@ -114,4 +118,3 @@ initializeDatabase()
     console.error('ERRO FATAL ao iniciar o banco:', err.message);
     process.exit(1);
   });
-
