@@ -19,7 +19,7 @@ const dbConfig = {
 // Middleware
 // O CORS permite que seu Front-end (rodando no Live Server) se comunique com esta API
 app.use(cors({
-    origin: '*', // Permitir acesso de qualquer origem durante o desenvolvimento
+    origin: ['http://127.0.0.1:5500', 'http://localhost:5500', '*'],  // Permitir acesso de qualquer origem durante o desenvolvimento
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type']
 }));
@@ -125,5 +125,6 @@ initializeDatabase().then(() => {
     });
 
 });
+
 
 
