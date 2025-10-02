@@ -35,7 +35,7 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(express.json()); // Permite que a API leia corpos de requisição JSON
+app.set('trust proxy', true); // Permite que a API leia corpos de requisição JSON
 
 let pool; // Variável para manter o pool de conexões do MySQL
 
@@ -131,4 +131,5 @@ initializeDatabase().then(() => {
         console.log(`API pronta para receber requisições em /contas-a-pagar`);
     });
 });
+
 
