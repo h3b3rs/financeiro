@@ -16,13 +16,23 @@ const dbConfig = {
     queueLimit: 0
 };
 
-// Middleware
-// O CORS permite que seu Front-end (rodando no Live Server) se comunique com esta API
-app.use(cors({
-    origin: ['http://127.0.0.1:5500', 'http://localhost:5500', '*'],  // Permitir acesso de qualquer origem durante o desenvolvimento
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type']
-}));
+// Middleware CORS MANUAL (Para garantir que o cabeçalho seja enviado pelo proxy)
+app.use((req, res, next) => {
+    // Permite que qualquer origem acesse (incluindo seu Live Server)
+    res.setHeader('Access-Control-Allow-Origin', '*'); 
+    
+    // Permite os métodos que o front-end usa
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+    
+    // Permite o cabeçalho Content-Type (essencial para o JSON)
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    // Responde a requisições OPTIONS (pré-voo do CORS) imediatamente
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
 
 app.use(express.json()); // Permite que a API leia corpos de requisição JSON
 
@@ -125,6 +135,7 @@ initializeDatabase().then(() => {
     });
 
 });
+
 
 
 
