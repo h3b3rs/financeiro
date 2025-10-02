@@ -7,7 +7,7 @@ const PORT = 3000;
 
 // Configuração da Conexão MySQL (Usando suas Credenciais)
 const dbConfig = {
-    host: 'hpspeniel_mysql', // Host Interno do EasyPanel
+    host: 'mysql', // Host Interno do EasyPanel
     user: 'mega',
     password: 'megamega',
     database: 'hpspeniel',
@@ -123,4 +123,5 @@ initializeDatabase().then(() => {
         console.log(`Servidor rodando na porta http://localhost:${PORT}`);
         console.log(`API pronta para receber requisições em /contas-a-pagar`);
     });
+
 });
