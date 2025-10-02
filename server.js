@@ -6,14 +6,18 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-/* ===== CORS =====
-   Em dev, permita as origens que você usa (Live Server e seu domínio).  */
-const ALLOWED_ORIGINS = [
-  'http://127.0.0.1:5500',
-  'http://localhost:5500',
-  'https://hpspeniel.com.br',
-  'https://www.hpspeniel.com.br'
-];
+/* ===== CORS ===== */
+const DEV_ORIGINS  = ['http://127.0.0.1:5500', 'http://localhost:5500'];
+const PROD_ORIGINS = ['https://hpspeniel.com.br', 'https://www.hpspeniel.com.br'];
+
+// Em produção, só libera dev se ALLOW_LOCAL_ORIGINS=1
+const EXTRA_ORIGINS =
+  process.env.ALLOW_LOCAL_ORIGINS === '1' ? DEV_ORIGINS : [];
+
+const ALLOWED_ORIGINS = process.env.NODE_ENV === 'production'
+  ? [...PROD_ORIGINS, ...EXTRA_ORIGINS]
+  : [...DEV_ORIGINS, ...PROD_ORIGINS];
+
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
@@ -24,16 +28,13 @@ app.use(cors({
   credentials: false,
   maxAge: 86400
 }));
-app.options('*', cors()); // responde preflight
+app.options('*', cors()); // preflight
 
-// lê JSON do body
+// Body parser
 app.use(express.json());
 app.set('trust proxy', true);
 
-/* ===== MySQL =====
-   ATENÇÃO: o host precisa ser o NOME do serviço MySQL no EasyPanel.
-   Se o seu serviço chama “mysql” mesmo, deixe assim.
-   Se o nome for outro (ex.: hpspeniel-mysql), troque abaixo. */
+/* ===== MySQL ===== */
 const dbConfig = {
   host: process.env.MYSQL_HOST || 'mysql',
   user: process.env.MYSQL_USER || 'mega',
@@ -52,11 +53,11 @@ async function initializeDatabase() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS contas_a_pagar (
       id INT AUTO_INCREMENT PRIMARY KEY,
-      valor DECIMAL(10,2) NOT NULL,
-      classe VARCHAR(50) NOT NULL,
-      centroCusto VARCHAR(50) NOT NULL,
+      valor DECIMAL(12,2) NOT NULL,
+      classe VARCHAR(80) NOT NULL,
+      centroCusto VARCHAR(80) NOT NULL,
       fornecedorNome VARCHAR(255) NOT NULL,
-      fornecedorDoc VARCHAR(30) NOT NULL,
+      fornecedorDoc VARCHAR(32) NOT NULL,
       tipoFornecedor ENUM('PF','PJ') NOT NULL,
       dataRegistro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -80,11 +81,14 @@ app.post('/contas-a-pagar', async (req, res) => {
     const fornecedorDoc  = fornecedor?.documento;
     const tipoFornecedor = fornecedor?.tipo; // 'PF' | 'PJ'
 
-    if (
-      valor === undefined || valor === null ||
-      !classe || !centroCusto || !fornecedorNome || !fornecedorDoc || !tipoFornecedor
-    ) {
-      return res.status(400).json({ error: "Todos os campos de conta e fornecedor são obrigatórios." });
+    // aceita "1.500,00" ou "1500.00"
+    const rawValor = (valor ?? '').toString().replace(/\./g, '').replace(',', '.');
+    const valorNum = Number(rawValor);
+
+    if (!Number.isFinite(valorNum) || valorNum <= 0 ||
+        !classe || !centroCusto || !fornecedorNome || !fornecedorDoc ||
+        !['PF','PJ'].includes(tipoFornecedor)) {
+      return res.status(400).json({ error: "Campos obrigatórios ausentes ou inválidos." });
     }
 
     const insertQuery = `
@@ -92,14 +96,8 @@ app.post('/contas-a-pagar', async (req, res) => {
       (valor, classe, centroCusto, fornecedorNome, fornecedorDoc, tipoFornecedor)
       VALUES (?, ?, ?, ?, ?, ?)
     `;
-    const values = [
-      Number(valor),
-      String(classe),
-      String(centroCusto),
-      String(fornecedorNome),
-      String(fornecedorDoc),
-      String(tipoFornecedor)
-    ];
+    const values = [valorNum, String(classe), String(centroCusto),
+                    String(fornecedorNome), String(fornecedorDoc), String(tipoFornecedor)];
 
     const [result] = await pool.query(insertQuery, values);
     return res.status(201).json({ message: "Conta registrada com sucesso!", id: result.insertId });
