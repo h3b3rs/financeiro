@@ -9,8 +9,6 @@ const PORT = process.env.PORT || 3000;
 /* ===== CORS =====
    Em dev, permita as origens que você usa (Live Server e seu domínio).  */
 const ALLOWED_ORIGINS = [
-  'http://127.0.0.1:5500',
-  'http://localhost:5500',
   'https://hpspeniel.com.br',
   'https://www.hpspeniel.com.br'
 ];
@@ -116,3 +114,4 @@ initializeDatabase()
     console.error('ERRO FATAL ao iniciar o banco:', err.message);
     process.exit(1);
   });
+
